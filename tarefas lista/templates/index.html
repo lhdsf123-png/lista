@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Game Todo List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Fonte gamer -->
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+
+    <style>
+         body {
+    background: url("../static/tarefas_xp_fundo.png") no-repeat center center fixed;
+    background-size: cover;
+    color: white;
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+}
+        h1, h2, h3 {
+            text-shadow: 2px 2px #000;
+        }
+        .card {
+            background-color: rgba(0,0,0,0.7);
+            border: 2px solid #00ffcc;
+            border-radius: 10px;
+        }
+        .btn {
+            font-family: 'Press Start 2P', cursive;
+        }
+        .xp-bar {
+            height: 25px;
+            background: #333;
+            border: 2px solid #00ffcc;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        .xp-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00ffcc, #00ff99);
+            transition: width 0.8s ease;
+        }
+        .badge {
+            font-size: 0.8em;
+        }
+        @media (max-width: 768px) {
+            h1 { font-size: 1.3em; }
+            h2 { font-size: 1.1em; }
+            h3 { font-size: 1em; }
+            .btn { font-size: 0.7em; padding: 8px 10px; }
+            .table { font-size: 0.8em; }
+        }
+    </style>
+</head>
+<body>
+<div class="container mt-4">
+    {% if usuario %}
+        <div class="card shadow p-4">
+            <h1 class="text-warning">🎮 Bem-vindo, {{ usuario.nome }}!</h1>
+        <div>
+<p><strong>XP:</strong> {{ usuario.xp }} | <strong>Nível:</strong> {{ usuario.nivel }}</p>
+
+<!-- Player Spotify -->
+<iframe data-testid="embed-iframe" style="border-radius:12px"
+        src="https://open.spotify.com/embed/playlist/741HfcYMK871cpb3gNXBs9?
+        utm_source=generator&theme=0" width="100%" height="152" frameBorder="0"
+       allowfullscreen="" allow="?autoplay=1; clipboard-write; encrypted-media; fullscreen;
+        picture-in-picture" loading="lazy"></iframe>
+
+            <p><strong>XP:</strong> {{ usuario.xp }} | <strong>Nível:</strong> {{ usuario.nivel }}</p>
+
+            <!-- Barra de XP -->
+            {% set xp_per_level = usuario.nivel * 50 %}
+            {% set xp_in_level = usuario.xp % xp_per_level %}
+            {% set xp_percent = (xp_in_level * 100) // xp_per_level %}
+            <div class="xp-bar mb-3">
+                <div class="xp-fill" style="width: {{ xp_percent }}%;"></div>
+            </div>
+            <small>Progresso para o próximo nível: {{ xp_percent }}%</small>
+
+            <h3 class="mt-3">➕ Nova Missão</h3>
+            <form method="POST" action="{{ url_for('add_tarefa') }}" class="row g-3">
+                <div class="col-md-6">
+                    <input type="text" name="descricao" class="form-control" placeholder="Descrição da missão" required>
+                </div>
+                <div class="col-md-4">
+                    <input type="date" name="dia" class="form-control">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-success w-100">Adicionar</button>
+                </div>
+            </form>
+
+            <h3 class="mt-4">📜 Missões Ativas</h3>
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Missão</th>
+                            <th>Data</th>
+                            <th>Status</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tarefa in usuario.tarefas %}
+                            <tr>
+                                <td>{{ tarefa.descricao }}</td>
+                                <td>{{ tarefa.dia }}</td>
+                                <td>
+                                    {% if tarefa.concluida %}
+                                        <span class="badge bg-success">✔ Concluída</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">❌ Pendente</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not tarefa.concluida %}
+                                        <a href="{{ url_for('concluir_tarefa', tarefa_id=tarefa.id) }}"
+                                           class="btn btn-primary btn-sm"
+                                           onclick="playVictorySound()">Finalizar</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+             <h3 class="mt-4">👥 Solicitações de Amizade</h3>
+            <ul>
+                 {% for amizade in usuario_amizades %}
+        {% if amizade.destinatario_id == usuario.id and amizade.status == "pendente" %}
+            <li>
+                Solicitação de <strong>{{ amizade.remetente.nome }}</strong>
+                <a href="{{ url_for('aceitar_amizade', amizade_id=amizade.id) }}" class="btn btn-success btn-sm">Aceitar</a>
+                <a href="{{ url_for('recusar_amizade', amizade_id=amizade.id) }}" class="btn btn-danger btn-sm">Recusar</a>
+            </li>
+        {% endif %}
+    {% endfor %}
+</ul>
+
+<h3 class="mt-4">🎯 Meus Amigos</h3>
+<ul>
+    {% for amizade in usuario_amizades %}
+        {% if amizade.status == "aceito" and (amizade.remetente_id == usuario.id or amizade.destinatario_id == usuario.id) %}
+            {% set amigo = amizade.remetente if amizade.destinatario_id == usuario.id else amizade.destinatario %}
+            <li>
+                {{ amigo.nome }} — Nível {{ amigo.nivel }} | XP {{ amigo.xp }}
+            </li>
+        {% endif %}
+    {% endfor %}
+</ul>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-2">Sair</a>
+        </div>
+    {% else %}
+        <div class="card shadow p-4 text-center">
+            <h1 class="text-warning">🎮 Login</h1>
+            <form method="POST" action="{{ url_for('login') }}" class="mb-3">
+                <input type="email" name="email" class="form-control mb-2" placeholder="Email" required>
+                <input type="password" name="senha" class="form-control mb-2" placeholder="Senha" required>
+                <button type="submit" class="btn btn-primary w-100">Entrar</button>
+            </form>
+
+            <h2 class="text-info">Registrar Novo Jogador</h2>
+            <form method="POST" action="{{ url_for('register') }}">
+                <input type="text" name="nome" class="form-control mb-2" placeholder="Nome" required>
+                <input type="email" name="email" class="form-control mb-2" placeholder="Email" required>
+                <input type="password" name="senha" class="form-control mb-2" placeholder="Senha" required>
+                <button type="submit" class="btn btn-success w-100">Registrar</button>
+            </form>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal Level Up -->
+<div class="modal fade" id="levelUpModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content bg-dark text-white text-center">
+      <div class="modal-body">
+        <h2>🎉 LEVEL UP!</h2>
+        <p>Você alcançou um novo nível!</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Sons -->
+<audio id="victorySound" src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg"></audio>
+<audio id="levelUpSound" src="https://actions.google.com/sounds/v1/cartoon/wood_plank_flicks.ogg"></audio>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+    function playVictorySound() {
+        document.getElementById("victorySound").play();
+    }
+
+    // Exemplo: mostrar modal Level Up se nível mudou
+    {% if usuario and usuario.xp % usuario.nivel*50 == 0 and usuario.xp != 0 %}
+        var levelUpModal = new bootstrap.Modal(document.getElementById('levelUpModal'));
+        levelUpModal.show();
+        document.getElementById("levelUpSound").play();
+    {% endif %}
+</script>
+ </body>
+</html>
