@@ -76,18 +76,22 @@ def index():
 
 @app.route("/register", methods=["POST"])
 def register():
-    nome = request.form.get("nome")
-    email = request.form.get("email")
-    senha = request.form.get("senha")
+    try:
+        nome = request.form.get("nome")
+        email = request.form.get("email")
+        senha = request.form.get("senha")
 
-    if Usuario.query.filter_by(email=email).first():
-        return "Email já registrado!"
+        if Usuario.query.filter_by(email=email).first():
+            return "Email já registrado!"
 
-    senha_hash = generate_password_hash(senha)
-    usuario = Usuario(nome=nome, email=email, senha=senha_hash)
-    db.session.add(usuario)
-    db.session.commit()
-    return redirect(url_for("index"))
+        senha_hash = generate_password_hash(senha)
+        usuario = Usuario(nome=nome, email=email, senha=senha_hash)
+        db.session.add(usuario)
+        db.session.commit()
+        return redirect(url_for("index"))
+    except Exception as e:
+        db.session.rollback()
+        return f"Erro ao cadastrar: {e}"
 
 @app.route("/login", methods=["POST"])
 def login():
@@ -174,4 +178,5 @@ with app.app_context():
 
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
+
     app.run(debug=True)
