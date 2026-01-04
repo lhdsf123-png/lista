@@ -1,0 +1,177 @@
+from flask import Flask, render_template, request, redirect, url_for, session
+from flask_sqlalchemy import SQLAlchemy
+from werkzeug.security import generate_password_hash, check_password_hash
+import datetime
+
+app = Flask(__name__)
+app.secret_key = "segredo_super_secreto"
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tarefas.db"
+db = SQLAlchemy(app)
+
+
+class Amizade(db.Model):
+    __tablename__ = "amizades"
+    id = db.Column(db.Integer, primary_key=True)
+    remetente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    destinatario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    status = db.Column(db.String(20), default="pendente")  # pendente, aceito, recusado
+
+
+# --- MODELOS ---
+class Usuario(db.Model):
+    __tablename__ = "usuarios"   # nome único
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(50), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    senha = db.Column(db.String(200), nullable=False)
+    xp = db.Column(db.Integer, default=0)
+    nivel = db.Column(db.Integer, default=1)
+    musica_url = db.Column(db.String(300), nullable=True)
+    autoplay = db.Column(db.Boolean, default=True)
+    tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
+
+    def ganhar_xp(self, quantidade):
+        self.xp += quantidade
+        while self.xp >= self.nivel * 50:
+            self.nivel += 1
+
+
+class Tarefa(db.Model):
+    __tablename__ = "tarefas"
+    id = db.Column(db.Integer, primary_key=True)
+    descricao = db.Column(db.String(200), nullable=False)
+    dia = db.Column(db.Date, default=datetime.date.today)
+    concluida = db.Column(db.Boolean, default=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+
+
+# --- ROTAS ---
+
+@app.route("/")
+def menu():
+    return render_template("menu.html")
+
+
+@app.route("/config-musica", methods=["GET", "POST"])
+def config_musica():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+    usuario = Usuario.query.get(session["usuario_id"])
+    if request.method == "POST":
+        usuario.musica_url = request.form.get("musica_url")
+        usuario.autoplay = True if request.form.get("autoplay") else False
+        db.session.commit()
+        return redirect(url_for("index"))
+    return render_template("config_musica.html", usuario=usuario)
+@app.route("/index")
+def index():
+    usuario = None
+    usuario_amizades = []
+    if "usuario_id" in session:
+        usuario = Usuario.query.get(session["usuario_id"])
+        usuario_amizades = Amizade.query.filter(
+            (Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)
+        ).all()
+    return render_template("index.html", usuario=usuario, usuario_amizades=usuario_amizades)
+
+@app.route("/register", methods=["POST"])
+def register():
+    nome = request.form.get("nome")
+    email = request.form.get("email")
+    senha = request.form.get("senha")
+
+    if Usuario.query.filter_by(email=email).first():
+        return "Email já registrado!"
+
+    senha_hash = generate_password_hash(senha)
+    usuario = Usuario(nome=nome, email=email, senha=senha_hash)
+    db.session.add(usuario)
+    db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/login", methods=["POST"])
+def login():
+    email = request.form.get("email")
+    senha = request.form.get("senha")
+
+    usuario = Usuario.query.filter_by(email=email).first()
+    if usuario and check_password_hash(usuario.senha, senha):
+        session["usuario_id"] = usuario.id
+        return redirect(url_for("index"))
+    return "Login inválido!"
+
+@app.route("/logout")
+def logout():
+    session.pop("usuario_id", None)
+    return redirect(url_for("index"))
+
+@app.route("/add", methods=["POST"])
+def add_tarefa():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    descricao = request.form.get("descricao")
+    dia = request.form.get("dia")
+    dia = datetime.datetime.strptime(dia, "%Y-%m-%d").date() if dia else datetime.date.today()
+
+    tarefa = Tarefa(descricao=descricao, dia=dia, usuario_id=session["usuario_id"])
+    db.session.add(tarefa)
+    db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/concluir/<int:tarefa_id>")
+def concluir_tarefa(tarefa_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    tarefa = Tarefa.query.get(tarefa_id)
+    if tarefa and not tarefa.concluida and tarefa.usuario_id == session["usuario_id"]:
+        tarefa.concluida = True
+        usuario = Usuario.query.get(session["usuario_id"])
+        usuario.ganhar_xp(10)
+        db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/ranking")
+def ranking():
+    jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
+    usuario = None
+    if "usuario_id" in session:
+        usuario = Usuario.query.get(session["usuario_id"])
+    return render_template("ranking.html", jogadores=jogadores, usuario=usuario)
+
+@app.route("/amizade/enviar/<int:destinatario_id>")
+def enviar_amizade(destinatario_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+    amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
+    db.session.add(amizade)
+    db.session.commit()
+    return redirect(url_for("ranking"))
+
+@app.route("/amizade/aceitar/<int:amizade_id>")
+def aceitar_amizade(amizade_id):
+    amizade = Amizade.query.get(amizade_id)
+    if amizade and amizade.destinatario_id == session["usuario_id"]:
+        amizade.status = "aceito"
+        db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/amizade/recusar/<int:amizade_id>")
+def recusar_amizade(amizade_id):
+    amizade = Amizade.query.get(amizade_id)
+    if amizade and amizade.destinatario_id == session["usuario_id"]:
+        amizade.status = "recusado"
+        db.session.commit()
+    return redirect(url_for("index"))
+
+
+
+
+# --- CRIAR BANCO ---
+with app.app_context():
+    db.create_all()
+
+# --- RODAR SERVIDOR ---
+if __name__ == "__main__":
+    app.run(debug=True)
