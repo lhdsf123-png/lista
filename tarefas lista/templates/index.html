@@ -71,7 +71,7 @@
         picture-in-picture" loading="lazy"></iframe>
 
             <p><strong>XP:</strong> {{ usuario.xp }} | <strong>Nível:</strong> {{ usuario.nivel }}</p>
-
+<p>🔥 Streak atual: {{ usuario.dias_consecutivos }} dias consecutivos</p>
             <!-- Barra de XP -->
             {% set xp_per_level = usuario.nivel * 50 %}
             {% set xp_in_level = usuario.xp % xp_per_level %}
@@ -205,4 +205,5 @@
     {% endif %}
 </script>
  </body>
+
 </html>
