@@ -10,6 +10,14 @@ db = SQLAlchemy(app)
 
 # --- MODELOS ---
 
+class FriendRequest(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
+    status = db.Column(db.String(20), default="pending")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class Amizade(db.Model):
     __tablename__ = "amizades"
     id = db.Column(db.Integer, primary_key=True)
@@ -192,6 +200,30 @@ def ranking():
 
     return render_template("ranking.html", jogadores=jogadores, amigos=amigos, usuario=usuario)
 
+@app.route("/send-friend-request/<int:receiver_id>", methods=["POST"])
+def send_friend_request(receiver_id):
+    sender_id = current_user.id  # supondo que você tenha login
+    request = FriendRequest(sender_id=sender_id, receiver_id=receiver_id)
+    db.session.add(request)
+    db.session.commit()
+    return jsonify({"message": "Solicitação enviada!"})
+    
+@app.route("/respond-friend-request/<int:request_id>", methods=["POST"])
+def respond_friend_request(request_id):
+    action = request.json.get("action")  # "accept" ou "reject"
+    request = FriendRequest.query.get(request_id)
+    if action == "accept":
+        request.status = "accepted"
+    elif action == "reject":
+        request.status = "rejected"
+    db.session.commit()
+    return jsonify({"message": f"Solicitação {action}!"})
+
+@app.route("/friend-requests", methods=["GET"])
+def list_friend_requests():
+    requests = FriendRequest.query.filter_by(receiver_id=current_user.id, status="pending").all()
+    return jsonify([{"id": r.id, "sender": r.sender_id} for r in requests])
+
 @app.route("/amizade/enviar/<int:destinatario_id>")
 def enviar_amizade(destinatario_id):
     if "usuario_id" not in session:
@@ -240,6 +272,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
