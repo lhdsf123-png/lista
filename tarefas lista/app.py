@@ -30,10 +30,13 @@ class Usuario(db.Model):
     autoplay = db.Column(db.Boolean, default=True)
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
 
-    def ganhar_xp(self, quantidade):
+           def ganhar_xp(self, quantidade):
         self.xp += quantidade
+        # sobe de nível apenas quando ultrapassa o limite
         while self.xp >= self.nivel * 50:
             self.nivel += 1
+            # aqui você pode salvar uma flag ou mensagem se quiser mostrar "level up"
+
 
 
 class Tarefa(db.Model):
@@ -186,3 +189,4 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
