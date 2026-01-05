@@ -38,7 +38,7 @@ class Usuario(db.Model):
     musica_url = db.Column(db.String(300), nullable=True)
     autoplay = db.Column(db.Boolean, default=True)
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
-    ultimo_login = db.Column(db.Date, default=datetime.date.today)
+    ultimo_login = db.Column(db.DateTime, default=datetime.now)
     dias_consecutivos = db.Column(db.Integer, default=0)
 
     def ganhar_xp(self, quantidade):
@@ -274,6 +274,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
