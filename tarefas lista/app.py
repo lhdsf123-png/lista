@@ -127,10 +127,11 @@ def login():
 
         # Conquista de streak
         conquista = Conquista.query.filter_by(nome=f"{usuario.dias_consecutivos} Dias Seguidos").first()
-        if conquista:
-            if not UsuarioConquista.query.filter_by(usuario_id=usuario.id, conquista_id=conquista.id).first():
-                uc = UsuarioConquista(usuario_id=usuario.id, conquista_id=conquista.id)
-                db.session.add(uc)
+        if conquista and not UsuarioConquista.query.filter_by(
+            usuario_id=usuario.id, conquista_id=conquista.id
+        ).first():
+            uc = UsuarioConquista(usuario_id=usuario.id, conquista_id=conquista.id)
+            db.session.add(uc)
 
         db.session.commit()
         session["usuario_id"] = usuario.id
@@ -175,13 +176,18 @@ def ranking():
         return redirect(url_for("index"))
     usuario = Usuario.query.get(session["usuario_id"])
 
+    # Ranking global
     jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
 
+    # Ranking só entre amigos (amizades aceitas)
     amizades = Amizade.query.filter(
         ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
         (Amizade.status == "aceito")
     ).all()
-    amigos_ids = {a.remetente_id if a.remetente_id != usuario.id else a.destinatario_id for a in amizades}
+    amigos_ids = {
+        a.remetente_id if a.remetente_id != usuario.id else a.destinatario_id
+        for a in amizades
+    }
     amigos = Usuario.query.filter(Usuario.id.in_(amigos_ids)).order_by(Usuario.xp.desc()).all()
 
     return render_template("ranking.html", jogadores=jogadores, amigos=amigos, usuario=usuario)
@@ -191,7 +197,13 @@ def enviar_amizade(destinatario_id):
     if "usuario_id" not in session:
         return redirect(url_for("index"))
 
-    if not Amizade.query.filter_by(remetente_id=session["usuario_id"], destinatario_id=destinatario_id).first():
+    # Evita duplicar solicitação pendente
+    existente = Amizade.query.filter_by(
+        remetente_id=session["usuario_id"],
+        destinatario_id=destinatario_id,
+        status="pendente"
+    ).first()
+    if not existente:
         amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
         db.session.add(amizade)
         db.session.commit()
@@ -210,12 +222,174 @@ def aceitar_amizade(amizade_id):
 
 @app.route("/amizade/recusar/<int:amizade_id>")
 def recusar_amizade(amizade_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    amizade = Amizade.query.get(amizade_id)
+    if amizade and amizade.destinatario_id == session["usuario_id"]:
+        amizade.status = "recusado"
+        db.session.commit()
+    return redirect(url_for("index"))@app.route("/")
+def menu():
+    return render_template("menu.html")
+
+@app.route("/config-musica", methods=["GET", "POST"])
+def config_musica():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+    usuario = Usuario.query.get(session["usuario_id"])
+    if request.method == "POST":
+        usuario.musica_url = request.form.get("musica_url")
+        usuario.autoplay = True if request.form.get("autoplay") else False
+        db.session.commit()
+        return redirect(url_for("index"))
+    return render_template("config_musica.html", usuario=usuario)
+
+@app.route("/index")
+def index():
+    usuario = None
+    usuario_amizades = []
+    if "usuario_id" in session:
+        usuario = Usuario.query.get(session["usuario_id"])
+        usuario_amizades = Amizade.query.filter(
+            (Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)
+        ).all()
+    return render_template("index.html", usuario=usuario, usuario_amizades=usuario_amizades)
+
+@app.route("/register", methods=["POST"])
+def register():
+    nome = request.form.get("nome")
+    email = request.form.get("email")
+    senha = request.form.get("senha")
+
+    if Usuario.query.filter_by(email=email).first():
+        return "Email já registrado!"
+
+    senha_hash = generate_password_hash(senha)
+    usuario = Usuario(nome=nome, email=email, senha=senha_hash)
+    db.session.add(usuario)
+    db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/login", methods=["POST"])
+def login():
+    email = request.form.get("email")
+    senha = request.form.get("senha")
+
+    usuario = Usuario.query.filter_by(email=email).first()
+    if usuario and check_password_hash(usuario.senha, senha):
+        hoje = datetime.date.today()
+        if usuario.ultimo_login == hoje - datetime.timedelta(days=1):
+            usuario.dias_consecutivos += 1
+        elif usuario.ultimo_login != hoje:
+            usuario.dias_consecutivos = 1
+        usuario.ultimo_login = hoje
+
+        # Conquista de streak
+        conquista = Conquista.query.filter_by(nome=f"{usuario.dias_consecutivos} Dias Seguidos").first()
+        if conquista and not UsuarioConquista.query.filter_by(
+            usuario_id=usuario.id, conquista_id=conquista.id
+        ).first():
+            uc = UsuarioConquista(usuario_id=usuario.id, conquista_id=conquista.id)
+            db.session.add(uc)
+
+        db.session.commit()
+        session["usuario_id"] = usuario.id
+        return redirect(url_for("index"))
+    return "Login inválido!"
+
+@app.route("/logout")
+def logout():
+    session.pop("usuario_id", None)
+    return redirect(url_for("index"))
+
+@app.route("/add", methods=["POST"])
+def add_tarefa():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    descricao = request.form.get("descricao")
+    dia = request.form.get("dia")
+    dia = datetime.datetime.strptime(dia, "%Y-%m-%d").date() if dia else datetime.date.today()
+
+    tarefa = Tarefa(descricao=descricao, dia=dia, usuario_id=session["usuario_id"])
+    db.session.add(tarefa)
+    db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/concluir/<int:tarefa_id>")
+def concluir_tarefa(tarefa_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    tarefa = Tarefa.query.get(tarefa_id)
+    if tarefa and not tarefa.concluida and tarefa.usuario_id == session["usuario_id"]:
+        tarefa.concluida = True
+        usuario = Usuario.query.get(session["usuario_id"])
+        usuario.ganhar_xp(10)
+        db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/ranking")
+def ranking():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+    usuario = Usuario.query.get(session["usuario_id"])
+
+    # Ranking global
+    jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
+
+    # Ranking só entre amigos (amizades aceitas)
+    amizades = Amizade.query.filter(
+        ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
+        (Amizade.status == "aceito")
+    ).all()
+    amigos_ids = {
+        a.remetente_id if a.remetente_id != usuario.id else a.destinatario_id
+        for a in amizades
+    }
+    amigos = Usuario.query.filter(Usuario.id.in_(amigos_ids)).order_by(Usuario.xp.desc()).all()
+
+    return render_template("ranking.html", jogadores=jogadores, amigos=amigos, usuario=usuario)
+
+@app.route("/amizade/enviar/<int:destinatario_id>")
+def enviar_amizade(destinatario_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    # Evita duplicar solicitação pendente
+    existente = Amizade.query.filter_by(
+        remetente_id=session["usuario_id"],
+        destinatario_id=destinatario_id,
+        status="pendente"
+    ).first()
+    if not existente:
+        amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
+        db.session.add(amizade)
+        db.session.commit()
+    return redirect(url_for("ranking"))
+
+@app.route("/amizade/aceitar/<int:amizade_id>")
+def aceitar_amizade(amizade_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    amizade = Amizade.query.get(amizade_id)
+    if amizade and amizade.destinatario_id == session["usuario_id"]:
+        amizade.status = "aceito"
+        db.session.commit()
+    return redirect(url_for("index"))
+
+@app.route("/amizade/recusar/<int:amizade_id>")
+def recusar_amizade(amizade_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
     amizade = Amizade.query.get(amizade_id)
     if amizade and amizade.destinatario_id == session["usuario_id"]:
         amizade.status = "recusado"
         db.session.commit()
     return redirect(url_for("index"))
-
 
 
 
@@ -227,6 +401,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
