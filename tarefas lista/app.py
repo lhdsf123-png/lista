@@ -29,7 +29,8 @@ class Usuario(db.Model):
     musica_url = db.Column(db.String(300), nullable=True)
     autoplay = db.Column(db.Boolean, default=True)
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
-
+    ultimo_login = db.Column(db.Date, default=datetime.date.today)
+    dias_consecutivos = db.Column(db.Integer, default=0)
           def ganhar_xp(self, quantidade):
     self.xp += quantidade
     # subir de nível
@@ -80,6 +81,18 @@ class Conquista(db.Model):
         if not Conquista.query.filter_by(nome=c.nome).first():
             db.session.add(c)
     db.session.commit()
+
+with app.app_context():
+    conquistas_streak = [
+        Conquista(nome="3 Dias Seguidos", descricao="Você manteve foco por 3 dias consecutivos!", icone="/static/icons/streak3.png"),
+        Conquista(nome="7 Dias Seguidos", descricao="Uma semana inteira de disciplina!", icone="/static/icons/streak7.png"),
+        Conquista(nome="30 Dias Seguidos", descricao="Um mês inteiro sem falhar!", icone="/static/icons/streak30.png"),
+    ]
+    for c in conquistas_streak:
+        if not Conquista.query.filter_by(nome=c.nome).first():
+            db.session.add(c)
+    db.session.commit()
+    
 class UsuarioConquista(db.Model):
     __tablename__ = "usuario_conquistas"
     id = db.Column(db.Integer, primary_key=True)
@@ -139,6 +152,21 @@ def login():
 
     usuario = Usuario.query.filter_by(email=email).first()
     if usuario and check_password_hash(usuario.senha, senha):
+        hoje = datetime.date.today()
+        if usuario.ultimo_login == hoje - datetime.timedelta(days=1):
+            usuario.dias_consecutivos += 1
+        elif usuario.ultimo_login != hoje:
+            usuario.dias_consecutivos = 1  # reinicia streak
+        usuario.ultimo_login = hoje
+
+        # Conquista de streak
+        conquista = Conquista.query.filter_by(nome=f"{usuario.dias_consecutivos} Dias Seguidos").first()
+        if conquista:
+            if not UsuarioConquista.query.filter_by(usuario_id=usuario.id, conquista_id=conquista.id).first():
+                uc = UsuarioConquista(usuario_id=usuario.id, conquista_id=conquista.id)
+                db.session.add(uc)
+
+        db.session.commit()
         session["usuario_id"] = usuario.id
         return redirect(url_for("index"))
     return "Login inválido!"
@@ -229,5 +257,6 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
