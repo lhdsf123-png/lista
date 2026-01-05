@@ -8,6 +8,7 @@ app.secret_key = "segredo_super_secreto"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tarefas.db"
 db = SQLAlchemy(app)
 
+# --- MODELOS ---
 
 class Amizade(db.Model):
     __tablename__ = "amizades"
@@ -16,10 +17,8 @@ class Amizade(db.Model):
     destinatario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     status = db.Column(db.String(20), default="pendente")  # pendente, aceito, recusado
 
-
-# --- MODELOS ---
 class Usuario(db.Model):
-    __tablename__ = "usuarios"   # nome único
+    __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(50), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
@@ -31,28 +30,17 @@ class Usuario(db.Model):
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
     ultimo_login = db.Column(db.Date, default=datetime.date.today)
     dias_consecutivos = db.Column(db.Integer, default=0)
-          def ganhar_xp(self, quantidade):
-    self.xp += quantidade
-    # subir de nível
-    while self.xp >= self.nivel * 50:
-        self.nivel += 1
-        # conquista de nível
-        conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
-        if conquista:
-            if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
-                uc = UsuarioConquista(usuario_id=self.id, conquista_id=conquista.id)
-                db.session.add(uc)def ganhar_xp(self, quantidade):
-    self.xp += quantidade
-    # subir de nível
-    while self.xp >= self.nivel * 50:
-        self.nivel += 1
-        # conquista de nível
-        conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
-        if conquista:
-            if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
-                uc = UsuarioConquista(usuario_id=self.id, conquista_id=conquista.id)
-                db.session.add(uc)
 
+    def ganhar_xp(self, quantidade):
+        self.xp += quantidade
+        while self.xp >= self.nivel * 50:
+            self.nivel += 1
+            # conquista de nível
+            conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
+            if conquista:
+                if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
+                    uc = UsuarioConquista(usuario_id=self.id, conquista_id=conquista.id)
+                    db.session.add(uc)
 
 class Tarefa(db.Model):
     __tablename__ = "tarefas"
@@ -62,37 +50,13 @@ class Tarefa(db.Model):
     concluida = db.Column(db.Boolean, default=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
 
-
-# --- ROTAS ---
-
 class Conquista(db.Model):
     __tablename__ = "conquistas"
     id = db.Column(db.Integer, primary_key=True)
     nome = db.Column(db.String(100), nullable=False)
     descricao = db.Column(db.String(200), nullable=False)
-    icone = db.Column(db.String(200), nullable=True)  # URL ou caminho do ícone
-    with app.app_context():
-    conquistas = [
-        Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
-        Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
-        Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
-    ]
-    for c in conquistas:
-        if not Conquista.query.filter_by(nome=c.nome).first():
-            db.session.add(c)
-    db.session.commit()
+    icone = db.Column(db.String(200), nullable=True)
 
-with app.app_context():
-    conquistas_streak = [
-        Conquista(nome="3 Dias Seguidos", descricao="Você manteve foco por 3 dias consecutivos!", icone="/static/icons/streak3.png"),
-        Conquista(nome="7 Dias Seguidos", descricao="Uma semana inteira de disciplina!", icone="/static/icons/streak7.png"),
-        Conquista(nome="30 Dias Seguidos", descricao="Um mês inteiro sem falhar!", icone="/static/icons/streak30.png"),
-    ]
-    for c in conquistas_streak:
-        if not Conquista.query.filter_by(nome=c.nome).first():
-            db.session.add(c)
-    db.session.commit()
-    
 class UsuarioConquista(db.Model):
     __tablename__ = "usuario_conquistas"
     id = db.Column(db.Integer, primary_key=True)
@@ -103,10 +67,11 @@ class UsuarioConquista(db.Model):
     usuario = db.relationship("Usuario", backref="conquistas")
     conquista = db.relationship("Conquista", backref="usuarios")
 
+# --- ROTAS ---
+
 @app.route("/")
 def menu():
     return render_template("menu.html")
-
 
 @app.route("/config-musica", methods=["GET", "POST"])
 def config_musica():
@@ -119,6 +84,7 @@ def config_musica():
         db.session.commit()
         return redirect(url_for("index"))
     return render_template("config_musica.html", usuario=usuario)
+
 @app.route("/index")
 def index():
     usuario = None
@@ -156,7 +122,7 @@ def login():
         if usuario.ultimo_login == hoje - datetime.timedelta(days=1):
             usuario.dias_consecutivos += 1
         elif usuario.ultimo_login != hoje:
-            usuario.dias_consecutivos = 1  # reinicia streak
+            usuario.dias_consecutivos = 1
         usuario.ultimo_login = hoje
 
         # Conquista de streak
@@ -209,10 +175,8 @@ def ranking():
         return redirect(url_for("index"))
     usuario = Usuario.query.get(session["usuario_id"])
 
-    # Ranking global
     jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
 
-    # Ranking só entre amigos
     amizades = Amizade.query.filter(
         ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
         (Amizade.status == "aceito")
@@ -224,18 +188,24 @@ def ranking():
 
 @app.route("/amizade/enviar/<int:destinatario_id>")
 def enviar_amizade(destinatario_id):
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
     if not Amizade.query.filter_by(remetente_id=session["usuario_id"], destinatario_id=destinatario_id).first():
-    amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
-    db.session.add(amizade)
-    db.session.commit()
+        amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
+        db.session.add(amizade)
+        db.session.commit()
     return redirect(url_for("ranking"))
 
 @app.route("/amizade/aceitar/<int:amizade_id>")
 def aceitar_amizade(amizade_id):
-    amigos = Amizade.query.filter(
-    ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
-    (Amizade.status == "aceito")
-).all()
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    amizade = Amizade.query.get(amizade_id)
+    if amizade and amizade.destinatario_id == session["usuario_id"]:
+        amizade.status = "aceito"
+        db.session.commit()
     return redirect(url_for("index"))
 
 @app.route("/amizade/recusar/<int:amizade_id>")
@@ -257,6 +227,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
