@@ -56,6 +56,9 @@
     </style>
 </head>
 <body>
+    <form action="/send-friend-request/{{ user.id }}" method="post">
+    <button type="submit">Enviar solicitação de amizade</button>
+</form>
 <div class="container mt-4">
     {% if usuario %}
         <div class="card shadow p-4">
@@ -134,9 +137,6 @@
                  {% for amizade in usuario_amizades %}
         {% if amizade.destinatario_id == usuario.id and amizade.status == "pendente" %}
             <li>
-                <form action="/send-friend-request/{{ user.id }}" method="post">
-                 <button type="submit">Enviar solicitação de amizade</button>
-                </form>
                 Solicitação de <strong>{{ amizade.remetente.nome }}</strong>
                 <a href="{{ url_for('aceitar_amizade', amizade_id=amizade.id) }}" class="btn btn-success btn-sm">Aceitar</a>
                 <a href="{{ url_for('recusar_amizade', amizade_id=amizade.id) }}" class="btn btn-danger btn-sm">Recusar</a>
@@ -210,4 +210,5 @@
  </body>
 
 </html>
+
 
