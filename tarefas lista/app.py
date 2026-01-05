@@ -1,7 +1,8 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-import datetime
+from datetime import datetime
+
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_secreto"
@@ -16,6 +17,7 @@ class FriendRequest(db.Model):
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String(20), default="pending")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
 
 
 class Amizade(db.Model):
@@ -272,6 +274,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
