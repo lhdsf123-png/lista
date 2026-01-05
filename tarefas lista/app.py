@@ -30,13 +30,27 @@ class Usuario(db.Model):
     autoplay = db.Column(db.Boolean, default=True)
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
 
-           def ganhar_xp(self, quantidade):
-        self.xp += quantidade
-        # sobe de nível apenas quando ultrapassa o limite
-        while self.xp >= self.nivel * 50:
-            self.nivel += 1
-            # aqui você pode salvar uma flag ou mensagem se quiser mostrar "level up"
-
+          def ganhar_xp(self, quantidade):
+    self.xp += quantidade
+    # subir de nível
+    while self.xp >= self.nivel * 50:
+        self.nivel += 1
+        # conquista de nível
+        conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
+        if conquista:
+            if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
+                uc = UsuarioConquista(usuario_id=self.id, conquista_id=conquista.id)
+                db.session.add(uc)def ganhar_xp(self, quantidade):
+    self.xp += quantidade
+    # subir de nível
+    while self.xp >= self.nivel * 50:
+        self.nivel += 1
+        # conquista de nível
+        conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
+        if conquista:
+            if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
+                uc = UsuarioConquista(usuario_id=self.id, conquista_id=conquista.id)
+                db.session.add(uc)
 
 
 class Tarefa(db.Model):
@@ -49,6 +63,32 @@ class Tarefa(db.Model):
 
 
 # --- ROTAS ---
+
+class Conquista(db.Model):
+    __tablename__ = "conquistas"
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(100), nullable=False)
+    descricao = db.Column(db.String(200), nullable=False)
+    icone = db.Column(db.String(200), nullable=True)  # URL ou caminho do ícone
+    with app.app_context():
+    conquistas = [
+        Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
+        Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
+        Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
+    ]
+    for c in conquistas:
+        if not Conquista.query.filter_by(nome=c.nome).first():
+            db.session.add(c)
+    db.session.commit()
+class UsuarioConquista(db.Model):
+    __tablename__ = "usuario_conquistas"
+    id = db.Column(db.Integer, primary_key=True)
+    usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    conquista_id = db.Column(db.Integer, db.ForeignKey("conquistas.id"), nullable=False)
+    data = db.Column(db.DateTime, default=datetime.datetime.utcnow)
+
+    usuario = db.relationship("Usuario", backref="conquistas")
+    conquista = db.relationship("Conquista", backref="usuarios")
 
 @app.route("/")
 def menu():
@@ -189,4 +229,5 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
