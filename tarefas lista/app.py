@@ -134,16 +134,26 @@ def concluir_tarefa(tarefa_id):
 
 @app.route("/ranking")
 def ranking():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+    usuario = Usuario.query.get(session["usuario_id"])
+
+    # Ranking global
     jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
-    usuario = None
-    if "usuario_id" in session:
-        usuario = Usuario.query.get(session["usuario_id"])
-    return render_template("ranking.html", jogadores=jogadores, usuario=usuario)
+
+    # Ranking só entre amigos
+    amizades = Amizade.query.filter(
+        ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
+        (Amizade.status == "aceito")
+    ).all()
+    amigos_ids = {a.remetente_id if a.remetente_id != usuario.id else a.destinatario_id for a in amizades}
+    amigos = Usuario.query.filter(Usuario.id.in_(amigos_ids)).order_by(Usuario.xp.desc()).all()
+
+    return render_template("ranking.html", jogadores=jogadores, amigos=amigos, usuario=usuario)
 
 @app.route("/amizade/enviar/<int:destinatario_id>")
 def enviar_amizade(destinatario_id):
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
+    if not Amizade.query.filter_by(remetente_id=session["usuario_id"], destinatario_id=destinatario_id).first():
     amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
     db.session.add(amizade)
     db.session.commit()
@@ -151,10 +161,10 @@ def enviar_amizade(destinatario_id):
 
 @app.route("/amizade/aceitar/<int:amizade_id>")
 def aceitar_amizade(amizade_id):
-    amizade = Amizade.query.get(amizade_id)
-    if amizade and amizade.destinatario_id == session["usuario_id"]:
-        amizade.status = "aceito"
-        db.session.commit()
+    amigos = Amizade.query.filter(
+    ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
+    (Amizade.status == "aceito")
+).all()
     return redirect(url_for("index"))
 
 @app.route("/amizade/recusar/<int:amizade_id>")
@@ -174,4 +184,5 @@ with app.app_context():
 
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
+
     app.run(debug=True)
