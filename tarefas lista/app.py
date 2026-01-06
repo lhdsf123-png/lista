@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from datetime import datetime, date
+from datetime import date
 
 
 app = Flask(__name__)
@@ -53,12 +53,10 @@ class Usuario(db.Model):
                     db.session.add(uc)
 
 class Tarefa(db.Model):
-    __tablename__ = "tarefas"
     id = db.Column(db.Integer, primary_key=True)
-    descricao = db.Column(db.String(200), nullable=False)
-    dia = db.Column(db.Date, default=datetime.date.today)
-    concluida = db.Column(db.Boolean, default=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+    dia = db.Column(db.Date, default=date.today)
+
 
 class Conquista(db.Model):
     __tablename__ = "conquistas"
@@ -274,6 +272,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
