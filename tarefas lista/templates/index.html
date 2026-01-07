@@ -95,39 +95,27 @@
             </form>
 
              <!-- Missões Ativas -->
-            <h3 class="mt-4">📜 Missões Ativas</h3>
-            <div class="table-responsive">
-                <table class="table table-dark table-striped table-hover">
-                    <thead>
-                        <tr>
-                            <th>Missão</th>
-                            <th>Data</th>
-                            <th>Status</th>
-                            <th>Ação</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for tarefa in usuario.tarefas %}
-                        <tr>
-                            <td>{{ tarefa.descricao }}</td>
-                            <td>{{ tarefa.dia }}</td>
-                            <td>
-                                {% if tarefa.concluida %}
-                                    <span class="badge bg-success">✔ Concluída</span>
-                                {% else %}
-                                    <span class="badge bg-danger">❌ Pendente</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if not tarefa.concluida %}
-                                    <a href="{{ url_for('concluir_tarefa', tarefa_id=tarefa.id) }}"
-                                       class="btn btn-primary btn-sm"
-                                       onclick="playVictorySound()">Finalizar</a>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
+<h3 class="mt-4">📜 Missões Ativas</h3>
+<table>
+  {% for tarefa in usuario.tarefas %}
+    <tr>
+      <td>{{ tarefa.descricao }}</td>
+      <td>{{ tarefa.dia }}</td>
+      ...
+    </tr>
+  {% endfor %}
+</table>
+
+<!-- Missões de Hoje -->
+<h3 class="mt-4">📅 Missões de Hoje</h3>
+<table>
+  {% for tarefa in tarefas_do_dia %}
+    <tr>
+      <td>{{ tarefa.descricao }}</td>
+      ...
+    </tr>
+  {% endfor %}
+</table>
                 </table>
             </div>
 
@@ -228,6 +216,7 @@
  </body>
 
 </html>
+
 
 
 
