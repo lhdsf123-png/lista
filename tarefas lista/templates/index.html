@@ -94,7 +94,7 @@
                 </div>
             </form>
 
-            <!-- Missões Ativas -->
+             <!-- Missões Ativas -->
             <h3 class="mt-4">📜 Missões Ativas</h3>
             <div class="table-responsive">
                 <table class="table table-dark table-striped table-hover">
@@ -131,6 +131,48 @@
                 </table>
             </div>
 
+            <!-- Missões do Dia -->
+            <h3 class="mt-4">📅 Missões de Hoje</h3>
+            <div class="table-responsive">
+                <table class="table table-dark table-striped table-hover">
+                    <thead>
+                        <tr>
+                            <th>Missão</th>
+                            <th>Status</th>
+                            <th>Ação</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% if tarefas_do_dia %}
+                            {% for tarefa in tarefas_do_dia %}
+                            <tr>
+                                <td>{{ tarefa.descricao }}</td>
+                                <td>
+                                    {% if tarefa.concluida %}
+                                        <span class="badge bg-success">✔ Concluída</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">❌ Pendente</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if not tarefa.concluida %}
+                                        <a href="{{ url_for('concluir_tarefa', tarefa_id=tarefa.id) }}"
+                                           class="btn btn-primary btn-sm"
+                                           onclick="playVictorySound()">Finalizar</a>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        {% else %}
+                            <tr>
+                                <td colspan="3" class="text-center">Nenhuma missão para hoje 🎉</td>
+                            </tr>
+                        {% endif %}
+                    </tbody>
+                </table>
+            </div>
+
+            <a href="{{ url_for('logout') }}" class="btn btn-outlin
             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-2">Sair</a>
         </div>
         {% else %}
@@ -186,6 +228,7 @@
  </body>
 
 </html>
+
 
 
 
