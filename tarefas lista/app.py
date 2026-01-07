@@ -1,21 +1,15 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-import datetime
+from main import db
 
+db.create_all()
 app = Flask(__name__)
 app.secret_key = "segredo_super_secreto"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tarefas.db"
 db = SQLAlchemy(app)
 
 # --- MODELOS ---
-
-class Amizade(db.Model):
-    __tablename__ = "amizades"
-    id = db.Column(db.Integer, primary_key=True)
-    remetente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    destinatario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    status = db.Column(db.String(20), default="pendente")  # pendente, aceito, recusado
 
 class Usuario(db.Model):
     __tablename__ = "usuarios"
@@ -28,8 +22,6 @@ class Usuario(db.Model):
     musica_url = db.Column(db.String(300), nullable=True)
     autoplay = db.Column(db.Boolean, default=True)
     tarefas = db.relationship("Tarefa", backref="usuario", lazy=True)
-    ultimo_login = db.Column(db.Date, default=datetime.date.today)
-    dias_consecutivos = db.Column(db.Integer, default=0)
 
     def ganhar_xp(self, quantidade):
         self.xp += quantidade
@@ -46,7 +38,6 @@ class Tarefa(db.Model):
     __tablename__ = "tarefas"
     id = db.Column(db.Integer, primary_key=True)
     descricao = db.Column(db.String(200), nullable=False)
-    dia = db.Column(db.Date, default=datetime.date.today)
     concluida = db.Column(db.Boolean, default=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
 
@@ -62,7 +53,6 @@ class UsuarioConquista(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
     conquista_id = db.Column(db.Integer, db.ForeignKey("conquistas.id"), nullable=False)
-    data = db.Column(db.DateTime, default=datetime.datetime.utcnow)
 
     usuario = db.relationship("Usuario", backref="conquistas")
     conquista = db.relationship("Conquista", backref="usuarios")
@@ -73,9 +63,6 @@ with app.app_context():
         Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
         Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
         Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
-        Conquista(nome="3 Dias Seguidos", descricao="Você manteve foco por 3 dias consecutivos!", icone="/static/icons/streak3.png"),
-        Conquista(nome="7 Dias Seguidos", descricao="Uma semana inteira de disciplina!", icone="/static/icons/streak7.png"),
-        Conquista(nome="30 Dias Seguidos", descricao="Um mês inteiro sem falhar!", icone="/static/icons/streak30.png"),
     ]
     for c in conquistas:
         if not Conquista.query.filter_by(nome=c.nome).first():
@@ -103,13 +90,9 @@ def config_musica():
 @app.route("/index")
 def index():
     usuario = None
-    usuario_amizades = []
     if "usuario_id" in session:
         usuario = Usuario.query.get(session["usuario_id"])
-        usuario_amizades = Amizade.query.filter(
-            (Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)
-        ).all()
-    return render_template("index.html", usuario=usuario, usuario_amizades=usuario_amizades)
+    return render_template("index.html", usuario=usuario)
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -133,21 +116,6 @@ def login():
 
     usuario = Usuario.query.filter_by(email=email).first()
     if usuario and check_password_hash(usuario.senha, senha):
-        hoje = datetime.date.today()
-        if usuario.ultimo_login == hoje - datetime.timedelta(days=1):
-            usuario.dias_consecutivos += 1
-        elif usuario.ultimo_login != hoje:
-            usuario.dias_consecutivos = 1
-        usuario.ultimo_login = hoje
-
-        # Conquista de streak
-        conquista = Conquista.query.filter_by(nome=f"{usuario.dias_consecutivos} Dias Seguidos").first()
-        if conquista:
-            if not UsuarioConquista.query.filter_by(usuario_id=usuario.id, conquista_id=conquista.id).first():
-                uc = UsuarioConquista(usuario_id=usuario.id, conquista_id=conquista.id)
-                db.session.add(uc)
-
-        db.session.commit()
         session["usuario_id"] = usuario.id
         return redirect(url_for("index"))
     return "Login inválido!"
@@ -163,10 +131,7 @@ def add_tarefa():
         return redirect(url_for("index"))
 
     descricao = request.form.get("descricao")
-    dia = request.form.get("dia")
-    dia = datetime.datetime.strptime(dia, "%Y-%m-%d").date() if dia else datetime.date.today()
-
-    tarefa = Tarefa(descricao=descricao, dia=dia, usuario_id=session["usuario_id"])
+    tarefa = Tarefa(descricao=descricao, usuario_id=session["usuario_id"])
     db.session.add(tarefa)
     db.session.commit()
     return redirect(url_for("index"))
@@ -189,57 +154,8 @@ def ranking():
     if "usuario_id" not in session:
         return redirect(url_for("index"))
     usuario = Usuario.query.get(session["usuario_id"])
-
     jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
-
-    amizades = Amizade.query.filter(
-        ((Amizade.remetente_id == usuario.id) | (Amizade.destinatario_id == usuario.id)) &
-        (Amizade.status == "aceito")
-    ).all()
-    amigos_ids = {a.remetente_id if a.remetente_id != usuario.id else a.destinatario_id for a in amizades}
-    amigos = Usuario.query.filter(Usuario.id.in_(amigos_ids)).order_by(Usuario.xp.desc()).all()
-
-    return render_template("ranking.html", jogadores=jogadores, amigos=amigos, usuario=usuario)
-
-@app.route("/amizade/enviar/<int:destinatario_id>")
-def enviar_amizade(destinatario_id):
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
-
-    # Evita duplicar solicitação pendente
-    existente = Amizade.query.filter_by(
-        remetente_id=session["usuario_id"],
-        destinatario_id=destinatario_id,
-        status="pendente"
-    ).first()
-    if not existente:
-        amizade = Amizade(remetente_id=session["usuario_id"], destinatario_id=destinatario_id)
-        db.session.add(amizade)
-        db.session.commit()
-    return redirect(url_for("ranking"))
-
-@app.route("/amizade/aceitar/<int:amizade_id>")
-def aceitar_amizade(amizade_id):
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
-
-    amizade = Amizade.query.get(amizade_id)
-    if amizade and amizade.destinatario_id == session["usuario_id"]:
-        amizade.status = "aceito"
-        db.session.commit()
-    return redirect(url_for("index"))
-
-@app.route("/amizade/recusar/<int:amizade_id>")
-def recusar_amizade(amizade_id):
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
-
-    amizade = Amizade.query.get(amizade_id)
-    if amizade and amizade.destinatario_id == session["usuario_id"]:
-        amizade.status = "recusado"
-        db.session.commit()
-    return redirect(url_for("index"))@app.route("/")
-
+    return render_template("ranking.html", jogadores=jogadores, usuario=usuario)
 
 # --- CRIAR BANCO ---
 with app.app_context():
@@ -247,7 +163,6 @@ with app.app_context():
 
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
-
     app.run(debug=True)
 
 
