@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
-from main import db
+from app import db
 
 db.create_all()
 app = Flask(__name__)
@@ -164,6 +164,7 @@ with app.app_context():
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
