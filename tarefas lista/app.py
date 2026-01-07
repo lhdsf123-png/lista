@@ -2,8 +2,6 @@ from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 
-
-db.create_all()
 app = Flask(__name__)
 app.secret_key = "segredo_super_secreto"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tarefas.db"
@@ -164,6 +162,7 @@ with app.app_context():
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
