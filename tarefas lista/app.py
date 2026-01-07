@@ -79,12 +79,10 @@ def index():
     tarefas_do_dia = []
     if "usuario_id" in session:
         usuario = Usuario.query.get(session["usuario_id"])
-        if usuario:  # só continua se encontrou o usuário
+        if usuario:
             hoje = datetime.date.today()
             tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
-    return render_template("index.html", usuario=usuario, tarefas_do_dia=tarefas_do_dia)
-
-@app.route("/register", methods=["POST"])
+    return render_template("index.html", usuario=usuario, tarefas_do_dia=tarefas_do_dia))
 def register():
     nome = request.form.get("nome")
     email = request.form.get("email")
@@ -153,6 +151,7 @@ def ranking():
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
