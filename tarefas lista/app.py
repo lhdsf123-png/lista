@@ -9,7 +9,6 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///tarefas.db"
 db = SQLAlchemy(app)
 
 # --- MODELOS ---
-
 class Usuario(db.Model):
     __tablename__ = "usuarios"
     id = db.Column(db.Integer, primary_key=True)
@@ -26,7 +25,6 @@ class Usuario(db.Model):
         self.xp += quantidade
         while self.xp >= self.nivel * 50:
             self.nivel += 1
-            # conquista de nível
             conquista = Conquista.query.filter_by(nome=f"Nível {self.nivel}").first()
             if conquista:
                 if not UsuarioConquista.query.filter_by(usuario_id=self.id, conquista_id=conquista.id).first():
@@ -37,9 +35,10 @@ class Tarefa(db.Model):
     __tablename__ = "tarefas"
     id = db.Column(db.Integer, primary_key=True)
     descricao = db.Column(db.String(200), nullable=False)
-    dia = db.Column(db.Date, nullable=False)   # <-- campo da data
+    dia = db.Column(db.Date, default=datetime.date.today)  # garante que cada tarefa tem uma data
     concluida = db.Column(db.Boolean, default=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
+
 class Conquista(db.Model):
     __tablename__ = "conquistas"
     id = db.Column(db.Integer, primary_key=True)
@@ -56,35 +55,23 @@ class UsuarioConquista(db.Model):
     usuario = db.relationship("Usuario", backref="conquistas")
     conquista = db.relationship("Conquista", backref="usuarios")
 
+# --- CRIAR BANCO E INICIALIZAR CONQUISTAS ---
+with app.app_context():
+    db.create_all()
+    conquistas = [
+        Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
+        Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
+        Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
+    ]
+    for c in conquistas:
+        if not Conquista.query.filter_by(nome=c.nome).first():
+            db.session.add(c)
+    db.session.commit()
+
 # --- ROTAS ---
-
-@app.route("/tarefas-hoje")
-def tarefas_hoje():
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
-
-    usuario = Usuario.query.get(session["usuario_id"])
-    hoje = datetime.date.today()
-
-    tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
-
-    return render_template("tarefas_hoje.html", usuario=usuario, tarefas=tarefas_do_dia, hoje=hoje)
-
 @app.route("/")
 def menu():
-    return render_template("menu.html")
-
-@app.route("/config-musica", methods=["GET", "POST"])
-def config_musica():
-    if "usuario_id" not in session:
-        return redirect(url_for("index"))
-    usuario = Usuario.query.get(session["usuario_id"])
-    if request.method == "POST":
-        usuario.musica_url = request.form.get("musica_url")
-        usuario.autoplay = True if request.form.get("autoplay") else False
-        db.session.commit()
-        return redirect(url_for("index"))
-    return render_template("config_musica.html", usuario=usuario)
+    return redirect(url_for("index"))
 
 @app.route("/index")
 def index():
@@ -93,10 +80,11 @@ def index():
     if "usuario_id" in session:
         usuario = Usuario.query.get(session["usuario_id"])
         if usuario:  # só continua se encontrou o usuário
-            import datetime
             hoje = datetime.date.today()
             tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
     return render_template("index.html", usuario=usuario, tarefas_do_dia=tarefas_do_dia)
+
+@app.route("/register", methods=["POST"])
 def register():
     nome = request.form.get("nome")
     email = request.form.get("email")
@@ -133,7 +121,10 @@ def add_tarefa():
         return redirect(url_for("index"))
 
     descricao = request.form.get("descricao")
-    tarefa = Tarefa(descricao=descricao, usuario_id=session["usuario_id"])
+    dia = request.form.get("dia")
+    dia = datetime.datetime.strptime(dia, "%Y-%m-%d").date() if dia else datetime.date.today()
+
+    tarefa = Tarefa(descricao=descricao, dia=dia, usuario_id=session["usuario_id"])
     db.session.add(tarefa)
     db.session.commit()
     return redirect(url_for("index"))
@@ -158,21 +149,6 @@ def ranking():
     usuario = Usuario.query.get(session["usuario_id"])
     jogadores = Usuario.query.order_by(Usuario.xp.desc()).all()
     return render_template("ranking.html", jogadores=jogadores, usuario=usuario)
-
-# --- CRIAR BANCO ---
-with app.app_context():
-    db.create_all()
-
-    # Inicializar conquistas
-    conquistas = [
-        Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
-        Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
-        Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
-    ]
-    for c in conquistas:
-        if not Conquista.query.filter_by(nome=c.nome).first():
-            db.session.add(c)
-    db.session.commit()
 
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
