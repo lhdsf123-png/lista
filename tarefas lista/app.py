@@ -159,9 +159,21 @@ def ranking():
 with app.app_context():
     db.create_all()
 
+    # Inicializar conquistas
+    conquistas = [
+        Conquista(nome="Primeira Tarefa", descricao="Concluiu sua primeira tarefa!", icone="/static/icons/task1.png"),
+        Conquista(nome="Nível 2", descricao="Alcançou o nível 2!", icone="/static/icons/level2.png"),
+        Conquista(nome="Nível 5", descricao="Alcançou o nível 5!", icone="/static/icons/level5.png"),
+    ]
+    for c in conquistas:
+        if not Conquista.query.filter_by(nome=c.nome).first():
+            db.session.add(c)
+    db.session.commit()
+
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
