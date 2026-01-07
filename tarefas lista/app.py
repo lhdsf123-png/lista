@@ -83,7 +83,7 @@ def index():
             hoje = datetime.date.today()
             tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
     return render_template("index.html", usuario=usuario, tarefas_do_dia=tarefas_do_dia)
-@app.route("/register")
+@app.route("/register", methods=["POST"])
 def register():
     nome = request.form.get("nome")
     email = request.form.get("email")
@@ -152,6 +152,7 @@ def ranking():
 # --- RODAR SERVIDOR ---
 if __name__ == "__main__":
     app.run(debug=True)
+
 
 
 
