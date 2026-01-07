@@ -11,21 +11,6 @@ db = SQLAlchemy(app)
 
 # --- MODELOS ---
 
-class FriendRequest(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    status = db.Column(db.String(20), default="pending")
-    
-
-
-
-class Amizade(db.Model):
-    __tablename__ = "amizades"
-    id = db.Column(db.Integer, primary_key=True)
-    remetente_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    destinatario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-    status = db.Column(db.String(20), default="pendente")  # pendente, aceito, recusado
 
 class Usuario(db.Model):
     __tablename__ = "usuarios"
@@ -272,6 +257,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
