@@ -131,31 +131,6 @@
                 </table>
             </div>
 
-            <!-- Solicitações de Amizade -->
-            <h3 class="mt-4">👥 Solicitações de Amizade</h3>
-            <ul>
-                {% for amizade in usuario_amizades %}
-                    {% if amizade.destinatario_id == usuario.id and amizade.status == "pendente" %}
-                        <li>
-                            Solicitação de <strong>{{ amizade.remetente.nome }}</strong>
-                            <a href="{{ url_for('aceitar_amizade', amizade_id=amizade.id) }}" class="btn btn-success btn-sm">Aceitar</a>
-                            <a href="{{ url_for('recusar_amizade', amizade_id=amizade.id) }}" class="btn btn-danger btn-sm">Recusar</a>
-                        </li>
-                    {% endif %}
-                {% endfor %}
-            </ul>
-
-            <!-- Lista de Amigos -->
-            <h3 class="mt-4">🎯 Meus Amigos</h3>
-            <ul>
-                {% for amizade in usuario_amizades %}
-                    {% if amizade.status == "aceito" and (amizade.remetente_id == usuario.id or amizade.destinatario_id == usuario.id) %}
-                        {% set amigo = amizade.remetente if amizade.destinatario_id == usuario.id else amizade.destinatario %}
-                        <li>{{ amigo.nome }} — Nível {{ amigo.nivel }} | XP {{ amigo.xp }}</li>
-                    {% endif %}
-                {% endfor %}
-            </ul>
-
             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger mt-2">Sair</a>
         </div>
         {% else %}
@@ -211,6 +186,7 @@
  </body>
 
 </html>
+
 
 
 
