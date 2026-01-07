@@ -177,7 +177,7 @@
     }
 
     // Exemplo: mostrar modal Level Up se nível mudou
-    {% if usuario and usuario.xp % usuario.nivel*50 == 0 and usuario.xp != 0 %}
+    {% if usuario and (usuario.xp % (usuario.nivel*50) == 0 and usuario.xp != 0) %}
         var levelUpModal = new bootstrap.Modal(document.getElementById('levelUpModal'));
         levelUpModal.show();
         document.getElementById("levelUpSound").play();
@@ -186,6 +186,7 @@
  </body>
 
 </html>
+
 
 
 
