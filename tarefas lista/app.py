@@ -16,7 +16,7 @@ class FriendRequest(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     receiver_id = db.Column(db.Integer, db.ForeignKey('user.id'))
     status = db.Column(db.String(20), default="pending")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
 
 
 
@@ -272,6 +272,7 @@ with app.app_context():
 if __name__ == "__main__":
 
     app.run(debug=True)
+
 
 
 
