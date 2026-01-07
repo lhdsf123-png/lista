@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+import datetime
 
 app = Flask(__name__)
 app.secret_key = "segredo_super_secreto"
@@ -36,9 +37,9 @@ class Tarefa(db.Model):
     __tablename__ = "tarefas"
     id = db.Column(db.Integer, primary_key=True)
     descricao = db.Column(db.String(200), nullable=False)
+    dia = db.Column(db.Date, nullable=False)   # <-- campo da data
     concluida = db.Column(db.Boolean, default=False)
     usuario_id = db.Column(db.Integer, db.ForeignKey("usuarios.id"), nullable=False)
-
 class Conquista(db.Model):
     __tablename__ = "conquistas"
     id = db.Column(db.Integer, primary_key=True)
@@ -56,6 +57,18 @@ class UsuarioConquista(db.Model):
     conquista = db.relationship("Conquista", backref="usuarios")
 
 # --- ROTAS ---
+
+@app.route("/tarefas-hoje")
+def tarefas_hoje():
+    if "usuario_id" not in session:
+        return redirect(url_for("index"))
+
+    usuario = Usuario.query.get(session["usuario_id"])
+    hoje = datetime.date.today()
+
+    tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
+
+    return render_template("tarefas_hoje.html", usuario=usuario, tarefas=tarefas_do_dia, hoje=hoje)
 
 @app.route("/")
 def menu():
@@ -76,10 +89,12 @@ def config_musica():
 @app.route("/index")
 def index():
     usuario = None
+    tarefas_do_dia = []
     if "usuario_id" in session:
         usuario = Usuario.query.get(session["usuario_id"])
-    return render_template("index.html", usuario=usuario)
-
+        hoje = datetime.date.today()
+        tarefas_do_dia = Tarefa.query.filter_by(usuario_id=usuario.id, dia=hoje).all()
+    return render_template("index.html", usuario=usuario, tarefas_do_dia=tarefas_do_dia)
 @app.route("/register", methods=["POST"])
 def register():
     nome = request.form.get("nome")
